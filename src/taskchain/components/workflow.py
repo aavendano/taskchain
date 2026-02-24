@@ -20,24 +20,15 @@ class Workflow(Executable[T]):
         self.steps = steps
         self.strategy = strategy
 
+    @property
+    def is_async(self) -> bool:
+        """Recursively checks if any step requires async execution."""
+        return any(step.is_async for step in self.steps)
+
     def execute(self, ctx: ExecutionContext[T]) -> Union[Outcome[T], Awaitable[Outcome[T]]]:
-        if self._is_async_workflow():
+        if self.is_async:
              return self._execute_async(ctx)
         return self._execute_sync(ctx)
-
-    def _is_async_workflow(self) -> bool:
-        """Recursively checks if any step requires async execution."""
-        for step in self.steps:
-            if isinstance(step, Task):
-                if inspect.iscoroutinefunction(step.func):
-                    return True
-            elif isinstance(step, Process):
-                if step._is_async_workflow():
-                    return True
-            elif isinstance(step, Workflow):
-                if step._is_async_workflow():
-                    return True
-        return False
 
     def _execute_sync(self, ctx: ExecutionContext[T]) -> Outcome[T]:
         ctx.log_event("INFO", self.name, "Workflow Started")
@@ -143,7 +134,7 @@ class Workflow(Executable[T]):
         return Outcome(final_status, ctx, collected_errors)
 
     def compensate(self, ctx: ExecutionContext[T]) -> Union[None, Awaitable[None]]:
-        if self._is_async_workflow():
+        if self.is_async:
             return self._compensate_async(ctx)
 
         ctx.log_event("INFO", self.name, "Compensating Workflow")

@@ -8,6 +8,14 @@ T = TypeVar("T")
 class Executable(Generic[T], ABC):
     """Abstract base class for all executable units in TaskChain."""
 
+    @property
+    @abstractmethod
+    def is_async(self) -> bool:
+        """
+        Determines if this executable requires asynchronous execution.
+        """
+        ...
+
     @abstractmethod
     def execute(self, ctx: ExecutionContext[T]) -> Union[Outcome[T], Awaitable[Outcome[T]]]:
         """

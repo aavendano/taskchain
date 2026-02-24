@@ -2,12 +2,14 @@ import inspect
 import time
 import asyncio
 from typing import Callable, Optional, Awaitable, Union, Any, TypeVar, Generic, cast
+import warnings
 
 from taskchain.core.context import ExecutionContext
 from taskchain.core.outcome import Outcome
 from taskchain.core.executable import Executable
 from taskchain.core.errors import TaskExecutionError
 from taskchain.policies.retry import RetryPolicy
+from taskchain.utils.inspection import is_async_callable
 
 T = TypeVar("T")
 
@@ -29,8 +31,13 @@ class Task(Executable[T]):
         self.retry_policy = retry_policy or RetryPolicy(max_attempts=1)
         self.undo = undo
 
+    @property
+    def is_async(self) -> bool:
+        """Determines if the task function is asynchronous."""
+        return is_async_callable(self.func)
+
     def execute(self, ctx: ExecutionContext[T]) -> Union[Outcome[T], Awaitable[Outcome[T]]]:
-        if inspect.iscoroutinefunction(self.func):
+        if self.is_async:
             return self._execute_async(ctx)
         else:
             return self._execute_sync(ctx)
@@ -42,7 +49,14 @@ class Task(Executable[T]):
 
         while True:
             try:
-                self.func(ctx)
+                res = self.func(ctx)
+
+                # Runtime check for false-negative async detection (e.g. lambdas returning coroutines)
+                if inspect.isawaitable(res):
+                    # We cannot await it here because we are in sync mode.
+                    # We must warn the user that their task logic probably didn't run.
+                    # Or raise an error? Raising error is safer.
+                    raise RuntimeError(f"Task '{self.name}' returned an awaitable (coroutine) but was executed synchronously. Check if the function is defined correctly or if AsyncRunner should be used.")
 
                 duration = int((time.time() - start_time) * 1000)
                 ctx.log_event("INFO", self.name, "Task Completed")
@@ -70,7 +84,9 @@ class Task(Executable[T]):
 
         while True:
             try:
-                await self.func(ctx)
+                res = self.func(ctx)
+                if inspect.isawaitable(res):
+                    await res
 
                 duration = int((time.time() - start_time) * 1000)
                 ctx.log_event("INFO", self.name, "Task Completed")
@@ -98,8 +114,9 @@ class Task(Executable[T]):
         ctx.log_event("INFO", self.name, "Compensating Task")
 
         undo_fn = self.undo
+        is_undo_async = is_async_callable(undo_fn)
 
-        if inspect.iscoroutinefunction(undo_fn):
+        if is_undo_async:
             return self._compensate_async(ctx)
         else:
             try:
@@ -114,7 +131,9 @@ class Task(Executable[T]):
             return
 
         try:
-            await self.undo(ctx)
+            res = self.undo(ctx)
+            if inspect.isawaitable(res):
+                await res
         except Exception as e:
             ctx.log_event("ERROR", self.name, f"Compensation Failed: {str(e)}")
             raise
