@@ -1,13 +1,12 @@
+import asyncio
 import inspect
 import time
-import asyncio
-from typing import Callable, Optional, Awaitable, Union, Any, TypeVar, Generic, cast
-import warnings
+from typing import Any, Awaitable, Callable, Optional, TypeVar, Union
 
 from taskchain.core.context import ExecutionContext
-from taskchain.core.outcome import Outcome
-from taskchain.core.executable import Executable
 from taskchain.core.errors import TaskExecutionError
+from taskchain.core.executable import Executable
+from taskchain.core.outcome import Outcome
 from taskchain.policies.retry import RetryPolicy
 from taskchain.utils.inspection import is_async_callable
 
@@ -30,11 +29,13 @@ class Task(Executable[T]):
         self.func = func
         self.retry_policy = retry_policy or RetryPolicy(max_attempts=1)
         self.undo = undo
+        self._is_async = is_async_callable(func)
+        self._is_undo_async = is_async_callable(undo) if undo else False
 
     @property
     def is_async(self) -> bool:
         """Determines if the task function is asynchronous."""
-        return is_async_callable(self.func)
+        return self._is_async
 
     def execute(self, ctx: ExecutionContext[T]) -> Union[Outcome[T], Awaitable[Outcome[T]]]:
         if self.is_async:
@@ -115,14 +116,11 @@ class Task(Executable[T]):
 
         ctx.log_event("INFO", self.name, "Compensating Task")
 
-        undo_fn = self.undo
-        is_undo_async = is_async_callable(undo_fn)
-
-        if is_undo_async:
+        if self._is_undo_async:
             return self._compensate_async(ctx)
         else:
             try:
-                undo_fn(ctx)
+                self.undo(ctx)
             except Exception as e:
                 ctx.log_event("ERROR", self.name, f"Compensation Failed: {str(e)}")
                 raise
