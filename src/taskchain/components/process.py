@@ -48,7 +48,7 @@ class Process(Executable[T]):
                          # Stop execution and bubble up failure
                          return result
             except Exception as e:
-                ctx.log_event("ERROR", self.name, f"Process Error: {str(e)}")
+                ctx.log_event("ERROR", self.name, f"Process Error: {ctx.format_exception(e)}")
                 # Wrap unknown errors in ProcessExecutionError
                 raise ProcessExecutionError(f"Process '{self.name}' failed") from e
 
@@ -68,7 +68,7 @@ class Process(Executable[T]):
                      if result.status != "SUCCESS":
                          return result
             except Exception as e:
-                ctx.log_event("ERROR", self.name, f"Process Error: {str(e)}")
+                ctx.log_event("ERROR", self.name, f"Process Error: {ctx.format_exception(e)}")
                 raise ProcessExecutionError(f"Process '{self.name}' failed") from e
 
         ctx.log_event("INFO", self.name, "Process Completed")

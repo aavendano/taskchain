@@ -72,7 +72,7 @@ class Workflow(Executable[T]):
                             return Outcome("FAILED", ctx, result.errors)
 
             except Exception as e:
-                ctx.log_event("ERROR", self.name, f"Workflow Error: {str(e)}")
+                ctx.log_event("ERROR", self.name, f"Workflow Error: {ctx.format_exception(e)}")
                 collected_errors.append(e)
 
                 if self.strategy == FailureStrategy.ABORT:
@@ -127,7 +127,7 @@ class Workflow(Executable[T]):
                              return Outcome("FAILED", ctx, result.errors)
 
             except Exception as e:
-                ctx.log_event("ERROR", self.name, f"Workflow Error: {str(e)}")
+                ctx.log_event("ERROR", self.name, f"Workflow Error: {ctx.format_exception(e)}")
                 collected_errors.append(e)
 
                 if self.strategy == FailureStrategy.ABORT:
