@@ -5,7 +5,7 @@ import time
 from typing import Any, Awaitable, Callable, Optional, TypeVar, Union
 
 from taskchain.core.context import ExecutionContext
-from taskchain.core.errors import TaskExecutionError, TaskTimeoutError
+from taskchain.core.errors import TaskExecutionError
 from taskchain.core.executable import Executable
 from taskchain.core.outcome import Outcome
 from taskchain.policies.retry import RetryPolicy
@@ -41,7 +41,8 @@ class Task(Executable[T]):
     @property
     def is_async(self) -> bool:
         """Determines if the task function is asynchronous."""
-        return is_async_callable(self.func)
+        # Optimized: Return pre-calculated value to avoid repeated inspection overhead
+        return self._is_async
 
     def execute(self, ctx: ExecutionContext[T]) -> Union[Outcome[T], Awaitable[Outcome[T]]]:
         if self.is_async:
@@ -69,6 +70,8 @@ class Task(Executable[T]):
 
                 # Runtime check for false-negative async detection (e.g. lambdas)
                 if inspect.isawaitable(res):
+                    if inspect.iscoroutine(res):
+                        res.close()
                     # We cannot await it here because we are in sync mode.
                     # We must warn the user that their task logic probably didn't run.
                     # Or raise an error? Raising error is safer.
@@ -158,14 +161,11 @@ class Task(Executable[T]):
 
         ctx.log_event("INFO", self.name, "Compensating Task")
 
-        undo_fn = self.undo
-        is_undo_async = is_async_callable(undo_fn)
-
-        if is_undo_async:
+        if self._is_undo_async:
             return self._compensate_async(ctx)
         else:
             try:
-                undo_fn(ctx)
+                self.undo(ctx)
             except Exception as e:
                 ctx.log_event("ERROR", self.name, f"Compensation Failed: {str(e)}")
                 raise
