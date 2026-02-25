@@ -2,10 +2,12 @@
 Decorators for wrapping user functions into library components.
 """
 
-from typing import Callable, Optional, List, Type, Any, TypeVar, Union
+from functools import update_wrapper
+from typing import Any, Callable, List, Optional, Type, TypeVar
+
 from taskchain.components.task import Task
-from taskchain.policies.retry import RetryPolicy, BackoffStrategy
 from taskchain.core.context import ExecutionContext
+from taskchain.policies.retry import BackoffStrategy, RetryPolicy
 
 T = TypeVar("T")
 
@@ -13,6 +15,7 @@ def task(
     name: Optional[str] = None,
     retry_policy: Optional[RetryPolicy] = None,
     undo: Optional[Callable[[ExecutionContext[Any]], Any]] = None,
+    timeout: Optional[float] = None,
     # Quick configuration arguments
     max_attempts: int = 1,
     delay: float = 1.0,
@@ -49,10 +52,15 @@ def task(
                 give_up_on=give_up_on or []
             )
 
-        return Task(
+        t = Task(
             name=task_name,
             func=func,
             retry_policy=policy,
-            undo=undo
+            undo=undo,
+            timeout=timeout
         )
+        # Update wrapper to preserve metadata (docstrings, name, etc.)
+        # We avoid updating __dict__ to prevent overwriting Task internal attributes
+        update_wrapper(t, func, updated=())
+        return t
     return decorator
