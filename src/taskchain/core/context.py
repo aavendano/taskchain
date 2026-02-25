@@ -6,10 +6,11 @@ all tasks and processes, accumulating data and tracking trace history.
 """
 
 import dataclasses
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Generic, TypeVar, Literal, List, Dict, Any, Type, Optional, Set
-import warnings
+from typing import Any, Dict, Generic, List, Literal, Optional, Set, Type, TypeVar
+
 from taskchain.utils import serialization
 
 T = TypeVar("T")
@@ -40,7 +41,7 @@ class ExecutionContext(Generic[T]):
     def to_json(self) -> str:
         """Serializes the context to a JSON string."""
         # Convert completed_steps (set) to list for JSON serialization before calling custom util
-        # Since to_json uses a default encoder, we can also add set handling there, 
+        # Since to_json uses a default encoder, we can also add set handling there,
         # but the safest local way is:
         serializable_self = {
             "data": self.data,
