@@ -8,6 +8,7 @@ from taskchain.components.workflow import Workflow as Chain
 from taskchain.runtime.runner import SyncRunner, AsyncRunner
 from taskchain.core.decorators import task
 from taskchain.policies.failure import FailureStrategy
+from taskchain.utils.execution import execute_workflow
 
 __all__ = [
     "Chain",
@@ -19,4 +20,5 @@ __all__ = [
     "AsyncRunner",
     "task",
     "FailureStrategy",
+    "execute_workflow",
 ]
