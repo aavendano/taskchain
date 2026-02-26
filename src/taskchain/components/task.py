@@ -5,7 +5,7 @@ import time
 from typing import Any, Awaitable, Callable, Optional, TypeVar, Union
 
 from taskchain.core.context import ExecutionContext
-from taskchain.core.errors import TaskExecutionError
+from taskchain.core.errors import TaskExecutionError, TaskTimeoutError
 from taskchain.core.executable import Executable
 from taskchain.core.outcome import Outcome
 from taskchain.policies.retry import RetryPolicy
@@ -37,6 +37,9 @@ class Task(Executable[T]):
         self.retry_policy = retry_policy or RetryPolicy(max_attempts=1)
         self.undo = undo
         self.timeout = timeout
+
+        self._is_async = is_async_callable(self.func)
+        self._is_undo_async = is_async_callable(self.undo) if self.undo else False
 
     @property
     def is_async(self) -> bool:
